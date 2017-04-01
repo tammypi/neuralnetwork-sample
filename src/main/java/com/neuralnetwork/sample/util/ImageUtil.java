@@ -25,8 +25,8 @@ Copyright [2017] [Pi Jing]
 */
 public class ImageUtil {
     private static ImageUtil imageUtil = null;
-    private int smallWidth = 28;
-    private int smallHeight = 28;
+    private int smallWidth = Constant.smallWidth;
+    private int smallHeight = Constant.smallHeight;
 
     private ImageUtil(){}
 
@@ -58,12 +58,12 @@ public class ImageUtil {
         for(String item:imageList){
             try {
                 BufferedImage bimage = ImageIO.read(new File(item));
-                //trans to 28*28 size
+                //resize to 28*28
                 Image smallImage = bimage.getScaledInstance(smallWidth, smallHeight, Image.SCALE_SMOOTH);
                 BufferedImage bSmallImage = new BufferedImage(smallWidth,smallHeight,BufferedImage.TYPE_INT_RGB);
-                Graphics graphics = bSmallImage.getGraphics();
-                graphics.drawImage(smallImage,0,0,null);
-                graphics.dispose();
+                Graphics graphics1 = bSmallImage.getGraphics();
+                graphics1.drawImage(smallImage, 0, 0, null);
+                graphics1.dispose();
 
                 //get gray value
                 int[] pixes = new int[smallWidth*smallHeight];
@@ -93,14 +93,24 @@ public class ImageUtil {
         return list;
     }
 
-    public double[] getGrayMatrixFromPanel(com.neuralnetwork.sample.ui.Canvas canvas){
+    public double[] getGrayMatrixFromPanel(com.neuralnetwork.sample.ui.Canvas canvas, int[] outline){
         Dimension imageSize = canvas.getSize();
         BufferedImage image = new BufferedImage(imageSize.width,imageSize.height, BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = image.createGraphics();
         canvas.paint(graphics);
         graphics.dispose();
 
-        //trans to 28*28 size
+        //cut
+        if(outline != null){
+            if(outline[0] + outline[2] > canvas.getWidth()){
+                outline[2] = canvas.getWidth()-outline[0];
+            }
+            if(outline[1] + outline[3] > canvas.getHeight()){
+                outline[3] = canvas.getHeight()-outline[1];
+            }
+            image = image.getSubimage(outline[0],outline[1],outline[2],outline[3]);
+        }
+        //resize to 28*28
         Image smallImage = image.getScaledInstance(smallWidth, smallHeight, Image.SCALE_SMOOTH);
         BufferedImage bSmallImage = new BufferedImage(smallWidth,smallHeight,BufferedImage.TYPE_INT_RGB);
         Graphics graphics1 = bSmallImage.getGraphics();
@@ -124,5 +134,17 @@ public class ImageUtil {
             }
         }
         return grayMatrix;
+    }
+
+    public int[] transGrayToBinaryValue(double[] input){
+        int[] binaryArray = new int[input.length];
+        for(int i=0;i<input.length;i++){
+            if(Double.compare(0.7, input[i]) >= 0){
+                binaryArray[i] = 1;
+            }else{
+                binaryArray[i] = 0;
+            }
+        }
+        return binaryArray;
     }
 }

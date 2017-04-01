@@ -32,11 +32,47 @@ public class Canvas extends JPanel implements MouseListener,MouseMotionListener{
     //record line list
     private ArrayList<Integer[]> lineLlist = new ArrayList<Integer[]>();
 
+    //outline rectangle record
+    private int outlineX = -1;
+    private int outlineY = -1;
+    private int outlineWidth = -1;
+    private int outlineHeight = -1;
+    private int outset = -1;
+
+    public void resetOutLine(){
+        this.outlineX = -1;
+        this.outlineY = -1;
+        this.outlineWidth = -1;
+        this.outlineHeight = -1;
+        this.outset = -1;
+    }
+
+    public void setOutLine(final int x,final int y,final int width,final int height){
+        new Thread(new Runnable() {
+            public void run() {
+                for(int i=50;i>=0;i--){
+                    try {
+                        outlineX = x-i;
+                        outlineY = y-i;
+                        outlineWidth = width+i*2;
+                        outlineHeight = height+i*2;
+                        outset = 1;
+                        repaint();
+                        Thread.sleep(5);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+            }
+        }).start();
+    }
+
     public Canvas(int width, int height){
         this.width = width;
         this.height = height;
 
-        this.setBorder(BorderFactory.createLineBorder(Color.red));
+        this.setBorder(BorderFactory.createLineBorder(Color.GRAY));
         this.setVisible(true);
 
         this.addMouseListener(this);
@@ -45,6 +81,7 @@ public class Canvas extends JPanel implements MouseListener,MouseMotionListener{
 
     public void clear(){
         this.lineLlist.clear();
+        this.resetOutLine();
         this.repaint();
     }
 
@@ -61,6 +98,12 @@ public class Canvas extends JPanel implements MouseListener,MouseMotionListener{
         for(int i=0;i<lineLlist.size();i++){
             g2d.drawLine(lineLlist.get(i)[0],lineLlist.get(i)[1],
                     lineLlist.get(i)[2],lineLlist.get(i)[3]);
+        }
+
+        if(outset != -1){
+            g2d.setColor(Color.RED);
+            g2d.setStroke(new BasicStroke(1));
+            g2d.drawRect(outlineX,outlineY,outlineWidth,outlineHeight);
         }
 
         g2d.dispose();

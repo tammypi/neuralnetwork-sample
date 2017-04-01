@@ -4,6 +4,7 @@ import com.neuralnetwork.sample.model.ImageModel;
 import com.neuralnetwork.sample.neuralnetwork.Network;
 import com.neuralnetwork.sample.util.ImageUtil;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReadParam;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -71,26 +72,32 @@ public class MainFrame extends JFrame{
         this.add(jbNum);
         this.jbNum.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                String str = (String) JOptionPane.showInputDialog(null, "Please input the number you write：\n", "Tell Me Number", JOptionPane.PLAIN_MESSAGE, null, null,
-                        "");
-                try {
-                    int digit = Integer.parseInt(str);
-                    if (digit < 0 || digit > 9) {
-                        canvas.clear();
-                        JOptionPane.showMessageDialog(null, "I can only learn number 0~9");
-                        Constant.digit = -1;
-                    } else {
-                        Constant.digit = digit;
-                        //save image and digit
-                        String fileName = saveJPanel();
-                        canvas.clear();
-                        JOptionPane.showMessageDialog(null, "I have remember the number:" + digit + ". Image file path:" + fileName);
-                    }
-                } catch (Exception ex) {
-                    ex.printStackTrace();
+                int[] outline = getOutline();
+                if(outline[0] == -10){
                     canvas.clear();
-                    Constant.digit = -1;
-                    JOptionPane.showMessageDialog(null, "I can only learn number 0~9");
+                    JOptionPane.showMessageDialog(null, "Please draw one number into the rectangle");
+                }else{
+                    String str = (String) JOptionPane.showInputDialog(null, "Please input the number you write：\n", "Tell Me Number", JOptionPane.PLAIN_MESSAGE, null, null,
+                            "");
+                    try {
+                        int digit = Integer.parseInt(str);
+                        if (digit < 0 || digit > 9) {
+                            canvas.clear();
+                            JOptionPane.showMessageDialog(null, "I can only learn number 0~9");
+                            Constant.digit = -1;
+                        } else {
+                            Constant.digit = digit;
+                            //save image and digit
+                            String fileName = saveJPanel(outline);
+                            canvas.clear();
+                            JOptionPane.showMessageDialog(null, "I have remember the number:" + digit + ". Image file path:" + fileName);
+                        }
+                    } catch (Exception ex) {
+                        //ex.printStackTrace();
+                        canvas.clear();
+                        Constant.digit = -1;
+                        JOptionPane.showMessageDialog(null, "I can only learn number 0~9");
+                    }
                 }
             }
         });
@@ -102,8 +109,8 @@ public class MainFrame extends JFrame{
         this.jbTrain.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 java.util.List<String> fileList = ImageUtil.getInstance().getImageList();
-                if (fileList.size() < 10) {
-                    JOptionPane.showMessageDialog(null, "You should create at least 10 train jpg. Try to use \"tell num\".");
+                if (fileList.size() < 500) {
+                    JOptionPane.showMessageDialog(null, "You should create at least 500 train jpg. Try to use \"tell num\".");
                 } else {
                     java.util.List<ImageModel> modelList = ImageUtil.getInstance().getImageModel(fileList);
                     //use modelList to train neural network
@@ -121,7 +128,8 @@ public class MainFrame extends JFrame{
                 if(!network.isTrain()){
                     JOptionPane.showMessageDialog(null,"You should train neural network first");
                 }else{
-                    int digit = network.predict(ImageUtil.getInstance().getGrayMatrixFromPanel(canvas));
+                    int[] outline = getOutline();
+                    int digit = network.predict(ImageUtil.getInstance().getGrayMatrixFromPanel(canvas, outline));
                     if(digit == -1){
                         JOptionPane.showMessageDialog(null,"I can not recognize this number");
                     }else{
@@ -134,17 +142,63 @@ public class MainFrame extends JFrame{
         this.setVisible(true);
     }
 
-    public String saveJPanel(){
+    public int[] getOutline(){
+        double[] grayMatrix = ImageUtil.getInstance().getGrayMatrixFromPanel(canvas, null);
+        int[] binaryArray = ImageUtil.getInstance().transGrayToBinaryValue(grayMatrix);
+        int minRow = Integer.MAX_VALUE;
+        int maxRow = Integer.MIN_VALUE;
+        int minCol = Integer.MAX_VALUE;
+        int maxCol = Integer.MIN_VALUE;
+        for(int i=0;i<binaryArray.length;i++){
+            int row = i/28;
+            int col = i%28;
+            if(binaryArray[i] == 1){
+                if(minRow > row){
+                    minRow = row;
+                }
+                if(maxRow < row){
+                    maxRow = row;
+                }
+                if(minCol > col){
+                    minCol = col;
+                }
+                if(maxCol < col){
+                    maxCol = col;
+                }
+            }
+        }
+        int len = Math.max((maxCol-minCol+1)*10, (maxRow-minRow+1)*10);
+        canvas.setOutLine(minCol*10, minRow*10, len, len);
+
+        return new int[]{minCol*10, minRow*10, len, len};
+    }
+
+    public String saveJPanel(int[] outline){
         Dimension imageSize = this.canvas.getSize();
         BufferedImage image = new BufferedImage(imageSize.width,imageSize.height, BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = image.createGraphics();
         this.canvas.paint(graphics);
         graphics.dispose();
         try {
+            //cut
+            if(outline[0] + outline[2] > canvas.getWidth()){
+                outline[2] = canvas.getWidth()-outline[0];
+            }
+            if(outline[1] + outline[3] > canvas.getHeight()){
+                outline[3] = canvas.getHeight()-outline[1];
+            }
+            image = image.getSubimage(outline[0],outline[1],outline[2],outline[3]);
+            //resize
+            Image smallImage = image.getScaledInstance(Constant.smallWidth, Constant.smallHeight, Image.SCALE_SMOOTH);
+            BufferedImage bSmallImage = new BufferedImage(Constant.smallWidth,Constant.smallHeight,BufferedImage.TYPE_INT_RGB);
+            Graphics graphics1 = bSmallImage.getGraphics();
+            graphics1.drawImage(smallImage, 0, 0, null);
+            graphics1.dispose();
+
             String fileName = String.format("%s/%d_%s.jpg",Constant.trainFolder,Constant.digit,java.util.UUID.randomUUID());
-            ImageIO.write(image, "jpg", new File(fileName));
+            ImageIO.write(bSmallImage, "jpg", new File(fileName));
             return fileName;
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return null;
